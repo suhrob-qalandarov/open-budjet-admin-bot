@@ -1,0 +1,13 @@
+package org.exp.openbudjetadminbot;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class OpenBudjetAdminBotApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(OpenBudjetAdminBotApplication.class, args);
+    }
+
+}
