@@ -2,7 +2,9 @@ package org.exp.openbudjetadminbot.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.exp.openbudjetadminbot.models.User;
+import org.exp.openbudjetadminbot.models.Vote;
 import org.exp.openbudjetadminbot.repository.UserRepository;
+import org.exp.openbudjetadminbot.repository.VoteRepository;
 import org.exp.openbudjetadminbot.service.face.UserService;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +16,7 @@ import java.util.Optional;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final VoteRepository voteRepository;
 
     @Override
     public User getOrSaveTgUser(com.pengrad.telegrambot.model.User tgUser) {
@@ -28,9 +31,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<String> checkUserVoted(User dbUser) {
-
-        return List.of();
+    public List<String> checkUserVoted(String phoneNumber) {
+        String last6Digits = phoneNumber.length() >= 6 ? phoneNumber.substring(phoneNumber.length() - 6) : phoneNumber;
+        return voteRepository.findAllByVoterPhoneLast6Digit(last6Digits).stream().map(Vote::getVoterPhoneLast6Digit).toList();
     }
 
     public User updateDbUser(com.pengrad.telegrambot.model.User tgUser) {

@@ -12,5 +12,5 @@ public interface UserService {
 
     boolean checkUserIsVoted(User dbUser);
 
-    List<String> checkUserVoted(User dbUser);
+    List<String> checkUserVoted(String phoneNumber);
 }

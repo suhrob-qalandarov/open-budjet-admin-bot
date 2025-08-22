@@ -5,8 +5,10 @@ import com.pengrad.telegrambot.model.Message;
 import com.pengrad.telegrambot.model.request.*;
 import com.pengrad.telegrambot.request.EditMessageText;
 import com.pengrad.telegrambot.request.SendMessage;
+import com.pengrad.telegrambot.response.BaseResponse;
 import com.pengrad.telegrambot.response.SendResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import org.exp.openbudjetadminbot.models.Content;
 import org.exp.openbudjetadminbot.models.User;
 import org.exp.openbudjetadminbot.repository.UserRepository;
@@ -24,6 +26,7 @@ public class MessageHandler implements Consumer<Message> {
     private final TelegramBot telegramBot;
     private final UserRepository userRepository;
 
+    @SneakyThrows
     @Override
     public void accept(Message message) {
         String text = message.text();
@@ -54,33 +57,59 @@ public class MessageHandler implements Consumer<Message> {
             if (!phone.startsWith("+")) phone = "+" + phone;
             dbUser.setPhoneNumber(phone);
 
-            SendResponse response = telegramBot.execute(new SendMessage(
+            telegramBot.execute(new SendMessage(
                     dbUser.getId(),
                     """
-                            Telefon raqami tekshirilayapti, kuting!
-                            
                             Хоразм вилояти Қўшкўпир тумани
-                            Xosiyon mahallasi Afrosiyob ko'chasini asfalt qilish
-                            """
+                            Xosiyon mahallasi Afrosiyob ko'chasini asfalt qilish"""
             ).replyMarkup(new ReplyKeyboardRemove()));
-            dbUser.setLastMessageId(response.message().messageId());
 
+            SendResponse response = telegramBot.execute(new SendMessage(dbUser.getId(), """
+                    Telefon raqami tekshirilayapti, kuting!
+                    Ovoz berilganligi aniqligi telefon raqamining oxirgi 6ta raqami orqali tekshiriladi!"""
+            ));
+
+            Thread.sleep(2500);
+
+            System.out.println(response.message().messageId());
+            dbUser.setLastMessageId(response.message().messageId());
             userRepository.save(dbUser);
 
-            boolean isVoted = userService.checkUserIsVoted(dbUser);
-            List<String> phoneNumbers = userService.checkUserVoted(dbUser);
+            List<String> phoneNumbers = userService.checkUserVoted(dbUser.getPhoneNumber());
 
-            if (isVoted) {
-                telegramBot.execute(new EditMessageText(dbUser.getId(), dbUser.getLastMessageId(), "Siz ovoz bergansiz!"));
+            System.out.println(phoneNumbers);
+
+            if (phoneNumbers.size()==1) {
+                telegramBot.execute(new EditMessageText(dbUser.getId(), response.message().messageId(), "Siz ovoz bergansiz!"));
                 dbUser.setIsVoted(true);
                 userRepository.save(dbUser);
                 return;
 
+            } else if (phoneNumbers.size() > 1) {
+                telegramBot.execute(new EditMessageText(dbUser.getId(), response.message().messageId(), "Sizning telefon raqamingizning oxirgi 6 ta raqami(" + phoneNumbers.getFirst() + ")ga o'xshash "
+                        + phoneNumbers.size() + " ta raqam topildi!"
+                ));
+                telegramBot.execute(new SendMessage(
+                        dbUser.getId(),
+                        "Yana bir bor ovoz berib sinab ko'ring buning uchun Ovoz berish tugmasini bosing!"
+                        ).replyMarkup(new InlineKeyboardMarkup(
+                                new InlineKeyboardButton("Ovoz berish").url("https://t.me/ochiqbudjetbot?start=052408466012")
+                        ))
+                );
+                return;
+
             } else {
-                telegramBot.execute(new EditMessageText(dbUser.getId(), dbUser.getLastMessageId(), "Siz ovoz bermagansiz!" +
-                        "\nIltimos ovoz bering va o'z hissangizni qo'shing!" +
-                        "\n\nOvoz berish uchun Ovoz berish tugmasini bosing!"
-                ).replyMarkup(new InlineKeyboardMarkup(new InlineKeyboardButton("Ovoz berish", "https://t.me/ochiqbudjetbot?start=052408466012"))));
+                BaseResponse response1 = telegramBot.execute(new EditMessageText(dbUser.getId(), dbUser.getLastMessageId(), "Siz ovoz bermagansiz!"));
+                System.out.println(response1);
+                telegramBot.execute(new SendMessage(
+                        dbUser.getId(),
+                        """
+                                Iltimos ovoz bering va o'z hissangizni qo'shing!
+                                Ovoz berish uchun Ovoz berish tugmasini bosing!"""
+                        ).replyMarkup(new InlineKeyboardMarkup(
+                                new InlineKeyboardButton("Ovoz berish").url("https://t.me/ochiqbudjetbot?start=052408466012")
+                        ))
+                );
                 return;
             }
 

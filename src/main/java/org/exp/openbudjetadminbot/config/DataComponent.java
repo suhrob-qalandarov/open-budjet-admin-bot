@@ -23,15 +23,17 @@ public class DataComponent implements CommandLineRunner {
     private final VoteService voteService;
     private final FetchStateRepository fetchStateRepository;
 
+    private static final String uuid = "68a8d1113f11cb648ffee723";
+
     @Override
     public void run(String... args) throws Exception {
 
-        fetchVotesJob();
+        //fetchVotesJob();
 
-        if (fetchStateRepository.count() == 0) {
+        if (fetchStateRepository.count() == 1) {
             FetchState state = new FetchState();
             state.setId("default");
-            state.setCurrentUuid("68a8b348ec67bd58e2890afd");
+            state.setCurrentUuid(uuid);
             state.setLastPage(0);
             state.setLastUpdate(LocalDateTime.now());
             fetchStateRepository.save(state);
@@ -67,10 +69,9 @@ public class DataComponent implements CommandLineRunner {
 
     }
 
-    @Scheduled(fixedRate = 1000)
+    @Scheduled(fixedRate = 3000)
     public void fetchVotesJob() {
-        String uuid = "68a8bd4bec67bd58e289395a";
         System.out.println("Fetching votes for UUID: " + uuid);
-        voteService.fetchNewVotes();
+        voteService.fetchNewVotes(uuid);
     }
 }
