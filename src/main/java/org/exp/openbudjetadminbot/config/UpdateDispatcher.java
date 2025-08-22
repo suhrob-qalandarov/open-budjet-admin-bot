@@ -1,6 +1,7 @@
 package org.exp.openbudjetadminbot.config;
 
 import com.pengrad.telegrambot.TelegramBot;
+import com.pengrad.telegrambot.UpdatesListener;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.exp.openbudjetadminbot.handlers.CallbackQueryHandler;
@@ -25,7 +26,7 @@ public class UpdateDispatcher implements CommandLineRunner {
                 else if (update.callbackQuery() != null) callbackQueryHandler.accept(update.callbackQuery());
                 else log.info("Unknown update {}", update);
             });
-            return 0;
+            return UpdatesListener.CONFIRMED_UPDATES_ALL;
         });
     }
 }
