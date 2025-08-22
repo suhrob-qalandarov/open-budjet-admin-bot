@@ -1,3 +1,4 @@
+/*
 package org.exp.openbudjetadminbot.models;
 
 import jakarta.persistence.*;
@@ -69,4 +70,4 @@ public class Initiative {
     private Long customerId;
 
     private String moderationSubStage;
-}
+}*/

@@ -6,7 +6,7 @@ import com.pengrad.telegrambot.response.SendResponse;
 import org.springframework.stereotype.Service;
 
 @Service
-public interface BotService {
+public interface BotResponseService {
 
     SendResponse sendMessage(SendMessage message);
 

@@ -19,12 +19,17 @@ public class User {
 
     @Id
     @Column(unique = true)
-    private Long telegramId;
+    private Long id;
+
+    @Builder.Default
+    private Boolean isVoted = false;
 
     private String fullName;
     private String username;
 
     private String phoneNumber;
+
+    private Integer lastMessageId;
 
     private String lastAction;
 
