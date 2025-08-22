@@ -23,23 +23,19 @@ public class VoteService {
     private final VoteRepository voteRepository;
     private final FetchStateRepository fetchStateRepository;
 
-    private String getNewUuid() {
-        return "68a8bd4bec67bd58e289395a"; // Sizning UUID
-    }
-
-    public void fetchNewVotes() {
+    public void fetchNewVotes(String oneTimeId) {
         FetchState state = fetchStateRepository.findById("default")
                 .orElseGet(() -> {
                     FetchState newState = new FetchState();
                     newState.setId("default");
-                    newState.setCurrentUuid(getNewUuid());
+                    newState.setCurrentUuid(oneTimeId);
                     newState.setLastPage(0);
                     newState.setLastUpdate(LocalDateTime.now());
                     return newState;
                 });
 
         if (state.getCurrentUuid() == null) {
-            state.setCurrentUuid(getNewUuid());
+            state.setCurrentUuid(oneTimeId);
             state.setLastPage(0);
             state.setLastUpdate(LocalDateTime.now());
         }
@@ -99,7 +95,7 @@ public class VoteService {
             } catch (FeignException e) {
                 if (e.status() == 411 || e.status() == 429 || e.status() == 404) {
                     System.out.println("Error: " + e.getMessage() + ". Trying new UUID.");
-                    uuid = getNewUuid();
+                    uuid = oneTimeId;
                     state.setCurrentUuid(uuid);
                     state.setLastPage(0);
                     fetchStateRepository.save(state);
