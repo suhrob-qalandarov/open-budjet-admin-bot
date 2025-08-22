@@ -1,4 +1,4 @@
-package org.exp.openbudjetadminbot.service;
+package org.exp.openbudjetadminbot.config;
 
 import com.pengrad.telegrambot.TelegramBot;
 import lombok.RequiredArgsConstructor;
