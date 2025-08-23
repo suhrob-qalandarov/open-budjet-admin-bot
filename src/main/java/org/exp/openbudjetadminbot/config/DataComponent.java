@@ -34,7 +34,7 @@ public class DataComponent implements CommandLineRunner {
     private final UserRepository userRepository;
     private final TelegramBot telegramBot;
 
-    private static final String uuid = "68a9968c3f11cb648f01951c";
+    private static final String uuid = "368a9dce3ca336c5f73f408d8";
 
     @Transactional
     @Override
@@ -42,7 +42,7 @@ public class DataComponent implements CommandLineRunner {
 
         fetchVotesJob(uuid);
         removeDuplicate();
-        sendStarterMessageToUsers();
+        //sendStarterMessageToUsers();
 
         if (contentRepository.count() == 0){
             Content content = Content.builder()
@@ -85,8 +85,8 @@ public class DataComponent implements CommandLineRunner {
                 try {
                     telegramBot.execute(new SendMessage(
                             user.getId(),
-                            "Bot yangilandi qayta /start bosing!" +
-                                    "\n\nOxirgi yangilangan ma'lumotlar vaqti: " + latestVoteDateNative.format(formatter)
+                            "🤖🔄Bot yangilandi qayta /start bosing!" +
+                                    "\n\n🕰Oxirgi yangilangan ma'lumotlar vaqti: " + latestVoteDateNative.format(formatter)
                     ));
                     log.info("Message sent to user: {}", user.getId());
                 } catch (Exception e) {
