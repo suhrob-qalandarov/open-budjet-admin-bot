@@ -55,7 +55,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<String> checkUserVoted(String phoneNumber) {
         String last6Digits = phoneNumber.length() >= 6 ? phoneNumber.substring(phoneNumber.length() - 6) : phoneNumber;
-        return voteRepository.findAllByVoterPhoneLast6Digit(last6Digits).stream().map(Vote::getVoterPhoneLast6Digit).toList();
+        return voteRepository.findAllByVoterPhoneLast6DigitOrderByVoteDateDesc(last6Digits).stream().map(Vote::getVoterPhoneLast6Digit).toList();
     }
 
     public User updateDbUser(com.pengrad.telegrambot.model.User tgUser) {

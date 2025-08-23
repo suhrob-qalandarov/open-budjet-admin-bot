@@ -21,9 +21,9 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
 
     boolean existsByVoterPhoneLast6Digit(String voterPhoneLast6Digit);
 
-    List<Vote> findAllByVoterPhoneLast6Digit(String voterPhoneLast6Digit);
+    List<Vote> findAllByVoterPhoneLast6DigitOrderByVoteDateDesc(String voterPhoneLast6Digit);
 
-    @Query("SELECT v FROM Vote v WHERE v.voterPhoneLast6Digit LIKE %:text%")
+    @Query("SELECT v FROM Vote v WHERE v.voterPhoneLast6Digit LIKE %:text% ORDER BY v.voteDate DESC")
     List<Vote> findAllByVoterPhoneLast6DigitContaining(@Param("text") String text);
 
     @Modifying
