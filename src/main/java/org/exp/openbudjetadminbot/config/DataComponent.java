@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -33,15 +34,15 @@ public class DataComponent implements CommandLineRunner {
     private final UserRepository userRepository;
     private final TelegramBot telegramBot;
 
-    private static final String uuid = "68a98c35ec67bd58e28bedf9";
+    private static final String uuid = "68a9968c3f11cb648f01951c";
 
     @Transactional
     @Override
     public void run(String... args) throws Exception {
 
-        fetchVotesJob();
+        fetchVotesJob(uuid);
         removeDuplicate();
-        //sendStarterMessageToUsers();
+        sendStarterMessageToUsers();
 
         if (contentRepository.count() == 0){
             Content content = Content.builder()
@@ -75,6 +76,7 @@ public class DataComponent implements CommandLineRunner {
 
     @Transactional
     public void sendStarterMessageToUsers() {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         LocalDateTime latestVoteDateNative = voteRepository.findLatestVoteDateNative();
         ExecutorService executor = Executors.newFixedThreadPool(5); // 5 ta thread
         List<User> users = userRepository.findAll();
@@ -84,7 +86,7 @@ public class DataComponent implements CommandLineRunner {
                     telegramBot.execute(new SendMessage(
                             user.getId(),
                             "Bot yangilandi qayta /start bosing!" +
-                                    "\n\nOxirgi olingan ma'lumotlar vaqti: " + latestVoteDateNative
+                                    "\n\nOxirgi yangilangan ma'lumotlar vaqti: " + latestVoteDateNative.format(formatter)
                     ));
                     log.info("Message sent to user: {}", user.getId());
                 } catch (Exception e) {
@@ -101,9 +103,9 @@ public class DataComponent implements CommandLineRunner {
     }
 
     //@Scheduled(fixedRate = 3000)
-    public void fetchVotesJob() {
+    public void fetchVotesJob(String id) {
         voteService.fetchNewVotes(
-                uuid,
+                id,
                 0,
                 10
         );
