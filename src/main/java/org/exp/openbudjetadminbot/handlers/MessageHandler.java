@@ -42,12 +42,34 @@ public class MessageHandler implements Consumer<Message> {
         if (text != null && text.equals("/start")) {
 
             if (dbUser.getIsVoted() == null || !dbUser.getIsVoted()) {
-                telegramBot.execute(new SendMessage(
-                                dbUser.getId(),
-                                "Botga xush kelibsiz!\nBu bot ochiq budjetning Xorazm viloyati Ko'shko'pir tumani uchun ishlab chiqilgan!" +
-                                        "\n\nESLATMA!\nKontaktni ulashish tugmasi orqali telefon raqamingizni yuboring!"
-                        ).replyMarkup(new ReplyKeyboardMarkup(new KeyboardButton("Kontaktni ulashish").requestContact(true)))
-                );
+                if (dbUser.getPhoneNumber() == null) {
+                    telegramBot.execute(new SendMessage(
+                                    dbUser.getId(),
+                                    "Botga xush kelibsiz!\nBu bot ochiq budjetning Xorazm viloyati Ko'shko'pir tumani uchun ishlab chiqilgan!" +
+                                            "\n\nESLATMA!\nKontaktni ulashish tugmasi orqali telefon raqamingizni yuboring!"
+                            ).replyMarkup(new ReplyKeyboardMarkup(new KeyboardButton("Kontaktni ulashish").requestContact(true)))
+                    );
+                } else {
+                    if (dbUser.getIsVoted()) {
+                        telegramBot.execute(new SendMessage(dbUser.getId(),
+                                        "Botga qayta xush kelibsiz!\nBu bot ochiq budjetning Xorazm viloyati Ko'shko'pir tumani uchun ishlab chiqilgan!"
+                                ).replyMarkup(new ReplyKeyboardMarkup(
+                                        new KeyboardButton("📊Ovozlar"),
+                                        new KeyboardButton("✅Tekshirish")
+                                ))
+                        );
+                    } else {
+                        telegramBot.execute(new SendMessage(dbUser.getId(),
+                                        "Botga qayta xush kelibsiz!" +
+                                                "\nBu bot ochiq budjetning Xorazm viloyati Ko'shko'pir tumani uchun ishlab chiqilgan!" +
+                                                "\n\nESLATMA! Siz ovoz bermagansiz!"
+                                ).replyMarkup(new ReplyKeyboardMarkup(
+                                        new KeyboardButton("📊Ovozlar"),
+                                        new KeyboardButton("✅Tekshirish")
+                                ))
+                        );
+                    }
+                }
                 return;
             } else {
                 telegramBot.execute(new SendMessage(
@@ -61,10 +83,11 @@ public class MessageHandler implements Consumer<Message> {
                 return;
             }
 
-        } else if (message.contact() != null) {
+        } else if (message.contact() != null && dbUser.getPhoneNumber()==null) {
             String phone = message.contact().phoneNumber();
             if (!phone.startsWith("+")) phone = "+" + phone;
             dbUser.setPhoneNumber(phone);
+            userRepository.save(dbUser);
 
             telegramBot.execute(new SendMessage(
                     dbUser.getId(),
@@ -76,15 +99,7 @@ public class MessageHandler implements Consumer<Message> {
                     Telefon raqami tekshirilayapti, kuting!"""
             ));
 
-            Thread.sleep(2500);
-
-            System.out.println(response.message().messageId());
-            dbUser.setLastMessageId(response.message().messageId());
-            userRepository.save(dbUser);
-
             List<String> phoneNumbers = userService.checkUserVoted(dbUser.getPhoneNumber());
-
-            System.out.println(phoneNumbers);
 
             if (phoneNumbers.size()==1) {
                 telegramBot.execute(new EditMessageText(dbUser.getId(), response.message().messageId(), "Siz ovoz bergansiz!"));
@@ -114,8 +129,7 @@ public class MessageHandler implements Consumer<Message> {
                 return;
 
             } else {
-                BaseResponse response1 = telegramBot.execute(new EditMessageText(dbUser.getId(), dbUser.getLastMessageId(), "Siz ovoz bermagansiz!"));
-                System.out.println(response1);
+                telegramBot.execute(new EditMessageText(dbUser.getId(), response.message().messageId(), "Siz ovoz bermagansiz!"));
                 telegramBot.execute(new SendMessage(
                         dbUser.getId(),
                         """

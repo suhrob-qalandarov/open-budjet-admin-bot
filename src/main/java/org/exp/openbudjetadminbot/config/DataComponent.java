@@ -1,34 +1,47 @@
 package org.exp.openbudjetadminbot.config;
 
+import com.pengrad.telegrambot.TelegramBot;
+import com.pengrad.telegrambot.request.SendMessage;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.exp.openbudjetadminbot.models.Content;
-import org.exp.openbudjetadminbot.models.FetchState;
+import org.exp.openbudjetadminbot.models.User;
 import org.exp.openbudjetadminbot.repository.ContentRepository;
-import org.exp.openbudjetadminbot.repository.FetchStateRepository;
+import org.exp.openbudjetadminbot.repository.UserRepository;
+import org.exp.openbudjetadminbot.repository.VoteRepository;
 import org.exp.openbudjetadminbot.service.feign.VoteService;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class DataComponent implements CommandLineRunner {
 
     private final ContentRepository contentRepository;
     private final VoteService voteService;
-    private final FetchStateRepository fetchStateRepository;
+    private final VoteRepository voteRepository;
+    private final UserRepository userRepository;
+    private final TelegramBot telegramBot;
 
-    private static final String uuid = "68a937b7ec67bd58e28a44c5";
+    private static final String uuid = "68a98c35ec67bd58e28bedf9";
 
+    @Transactional
     @Override
     public void run(String... args) throws Exception {
 
         fetchVotesJob();
+        removeDuplicate();
+        //sendStarterMessageToUsers();
 
         if (contentRepository.count() == 0){
             Content content = Content.builder()
@@ -60,13 +73,44 @@ public class DataComponent implements CommandLineRunner {
 
     }
 
+    @Transactional
+    public void sendStarterMessageToUsers() {
+        LocalDateTime latestVoteDateNative = voteRepository.findLatestVoteDateNative();
+        ExecutorService executor = Executors.newFixedThreadPool(5); // 5 ta thread
+        List<User> users = userRepository.findAll();
+        for (User user : users) {
+            executor.submit(() -> {
+                try {
+                    telegramBot.execute(new SendMessage(
+                            user.getId(),
+                            "Bot yangilandi qayta /start bosing!" +
+                                    "\n\nOxirgi olingan ma'lumotlar vaqti: " + latestVoteDateNative
+                    ));
+                    log.info("Message sent to user: {}", user.getId());
+                } catch (Exception e) {
+                    log.error("Failed to send message to user {}: {}", user.getId(), e.getMessage());
+                }
+            });
+        }
+        executor.shutdown();
+        try {
+            executor.awaitTermination(1, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            log.error("Executor termination interrupted", e);
+        }
+    }
+
     //@Scheduled(fixedRate = 3000)
     public void fetchVotesJob() {
-        System.out.println("Fetching votes for UUID: " + uuid);
         voteService.fetchNewVotes(
-                "68a977533f11cb648f00f22a",
+                uuid,
                 0,
-                2
+                10
         );
+    }
+
+    @Transactional
+    public void removeDuplicate() {
+        voteRepository.deleteDuplicatesByVoterPhoneLast6DigitAndVoteDate();
     }
 }
