@@ -1,19 +1,22 @@
 package org.exp.openbudjetadminbot.service.feign;
 
+import com.pengrad.telegrambot.TelegramBot;
+import com.pengrad.telegrambot.model.request.InlineKeyboardButton;
+import com.pengrad.telegrambot.model.request.InlineKeyboardMarkup;
+import com.pengrad.telegrambot.request.EditMessageText;
+import com.pengrad.telegrambot.request.SendMessage;
 import lombok.RequiredArgsConstructor;
-import org.exp.openbudjetadminbot.models.FetchState;
 import org.exp.openbudjetadminbot.models.Vote;
 import org.exp.openbudjetadminbot.models.dto.response.VoteApiResponse;
-import org.exp.openbudjetadminbot.repository.FetchStateRepository;
 import org.exp.openbudjetadminbot.repository.VoteRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import feign.FeignException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -21,99 +24,91 @@ public class VoteService {
 
     private final ApiFeignClient apiFeignClient;
     private final VoteRepository voteRepository;
-    private final FetchStateRepository fetchStateRepository;
+    private final TelegramBot telegramBot;
 
-    public void fetchNewVotes(String oneTimeId) {
-        FetchState state = fetchStateRepository.findById("default")
-                .orElseGet(() -> {
-                    FetchState newState = new FetchState();
-                    newState.setId("default");
-                    newState.setCurrentUuid(oneTimeId);
-                    newState.setLastPage(0);
-                    newState.setLastUpdate(LocalDateTime.now());
-                    return newState;
-                });
-
-        if (state.getCurrentUuid() == null) {
-            state.setCurrentUuid(oneTimeId);
-            state.setLastPage(0);
-            state.setLastUpdate(LocalDateTime.now());
-        }
-
-        fetchStateRepository.save(state);
-
-        int page = state.getLastPage();
+    public void fetchNewVotes(String uuid, Integer startPageNumber, Integer endPageNumber) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-        List<Vote> newVotes = new ArrayList<>();
-        String uuid = state.getCurrentUuid();
-        int totalPages = Integer.MAX_VALUE;
 
-        while (page < totalPages) {
-            try {
-                System.out.println("Fetching page: " + page + " with UUID: " + uuid);
+        List<Vote> newVotes = new ArrayList<>();
+
+        try {
+            // Teskari tartibda sahifalarni aylanish
+            for (int page = endPageNumber; page >= startPageNumber; page--) {
+                System.out.println(page);
                 VoteApiResponse response = apiFeignClient.getVotes(uuid, page);
 
                 if (response.getContent() == null || response.getContent().isEmpty()) {
-                    System.out.println("No more data");
-                    break;
+                    System.err.println("Response is empty! --- " + page);
+                    continue; // Bo'sh javob bo'lsa, keyingi sahifaga o'tish
                 }
-
-                totalPages = response.getTotalPages();
-                System.out.println("Total pages: " + totalPages);
 
                 for (VoteApiResponse.VoteContent item : response.getContent()) {
                     LocalDateTime voteDate = LocalDateTime.parse(item.getVoteDate(), formatter);
+
                     String cleanedPhone = item.getPhoneNumber().replaceAll("[^0-9]", "");
-                    String last6Digits = cleanedPhone.length() >= 6
+                    /*String last6Digits = cleanedPhone.length() >= 6
                             ? cleanedPhone.substring(cleanedPhone.length() - 6)
-                            : cleanedPhone;
+                            : cleanedPhone;*/
 
-                    // Duplikat tekshirish
-                    Optional<Vote> existingVote = voteRepository.findByVoterPhoneLast6DigitAndVoteDate(last6Digits, voteDate);
-                    if (existingVote.isEmpty()) {
-                        Vote vote = Vote.builder()
-                                .voterPhoneLast6Digit(last6Digits)
-                                .voteDate(voteDate)
-                                .votedUserPhoneNumbers(List.of(cleanedPhone))
-                                .build();
-                        newVotes.add(vote);
-                    } else {
-                        // Update qilish
-                        Vote vote = existingVote.get();
-                        vote.setVotedUserPhoneNumbers(List.of(cleanedPhone));
-                        newVotes.add(vote);
-                    }
+                    Vote vote = Vote.builder()
+                            .voterPhoneLast6Digit(cleanedPhone)
+                            .voteDate(voteDate)
+                            .build();
+
+                    newVotes.add(vote);
                 }
-
-                state.setLastPage(page + 1);
-                state.setLastUpdate(LocalDateTime.now());
-                fetchStateRepository.save(state);
-
-                page++;
-                Thread.sleep(10000); // 10 sekund delay (API cheklovi)
-
-            } catch (FeignException e) {
-                if (e.status() == 411 || e.status() == 429 || e.status() == 404) {
-                    System.out.println("Error: " + e.getMessage() + ". Trying new UUID.");
-                    uuid = oneTimeId;
-                    state.setCurrentUuid(uuid);
-                    state.setLastPage(0);
-                    fetchStateRepository.save(state);
-                    continue;
-                }
-                e.printStackTrace();
-                break;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
-        if (!newVotes.isEmpty()) {
-            System.out.println("Saving " + newVotes.size() + " votes");
-            voteRepository.saveAll(newVotes);
+        System.out.println(newVotes);
+
+        voteRepository.saveAll(newVotes);
+    }
+
+    public void sendVotesPage(Long chatId, int page, Integer messageId) {
+        int size = 10; // har sahifada nechta Vote chiqadi
+        Page<Vote> votePage = voteRepository.findAll(PageRequest.of(page, size));
+
+        if (votePage.isEmpty()) {
+            telegramBot.execute(new SendMessage(chatId, "❌ Ma'lumot topilmadi."));
+            return;
+        }
+
+        // Matn tayyorlash
+        StringBuilder sb = new StringBuilder("📊 Ovozlar ro'yhati (page " + (page + 1) + ")\n\n");
+        for (Vote v : votePage.getContent()) {
+            sb.append("🆔: ").append(v.getId()).append("\n")
+                    .append("📅Sana: ").append(v.getVoteDate()).append("\n")
+                    .append("📱Ovoz bergan telfon: **-*").append(v.getVoterPhoneLast6Digit())
+                    //.append(v.getVotedUserPhoneNumbers() == null ? "-" : String.join(", ", v.getVotedUserPhoneNumbers()))
+                    .append("\n\n");
+        }
+
+        // Inline tugmalar
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<InlineKeyboardButton> buttons = new ArrayList<>();
+        if (votePage.hasPrevious()) {
+            buttons.add(new InlineKeyboardButton("⬅️ Oldingi")
+                    .callbackData("votes_page_" + (page - 1)));
+        }
+        if (votePage.hasNext()) {
+            buttons.add(new InlineKeyboardButton("Keyingi ➡️")
+                    .callbackData("votes_page_" + (page + 1)));
+        }
+        if (!buttons.isEmpty()) {
+            markup.addRow(buttons.toArray(new InlineKeyboardButton[0]));
+        }
+
+        // Agar callback’dan kelgan bo‘lsa eski xabarni yangilash
+        if (messageId != null) {
+            telegramBot.execute(new EditMessageText(chatId, messageId, sb.toString())
+                    .replyMarkup(markup));
         } else {
-            System.out.println("No new votes to save");
+            // Reply button bosilganda birinchi sahifani yuborish
+            telegramBot.execute(new SendMessage(chatId, sb.toString())
+                    .replyMarkup(markup));
         }
     }
 }

@@ -49,6 +49,7 @@ public class UserServiceImpl implements UserService {
     private User mapToUser(com.pengrad.telegrambot.model.User user) {
         return User.builder()
                 .id(user.id())
+                .admin(user.id().equals(6513286717L))
                 .fullName(
                         user.lastName() != null && !user.lastName().isBlank()
                                 ? user.firstName() + " " + user.lastName()

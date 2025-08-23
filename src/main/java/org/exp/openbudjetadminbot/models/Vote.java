@@ -24,8 +24,4 @@ public class Vote {
     @Column(name = "vote_date")
     private LocalDateTime voteDate;
 
-    @ElementCollection
-    @CollectionTable(name = "vote_user_phones", joinColumns = @JoinColumn(name = "vote_id"))
-    @Column(name = "phone_number")
-    private List<String> votedUserPhoneNumbers;
 }

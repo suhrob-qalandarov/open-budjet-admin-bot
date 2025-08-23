@@ -3,6 +3,7 @@ package org.exp.openbudjetadminbot.repository;
 import org.exp.openbudjetadminbot.models.Vote;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -20,5 +21,8 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
     boolean existsByVoterPhoneLast6Digit(String voterPhoneLast6Digit);
 
     List<Vote> findAllByVoterPhoneLast6Digit(String voterPhoneLast6Digit);
+
+    @Query("SELECT v FROM Vote v WHERE v.voterPhoneLast6Digit LIKE %:text%")
+    List<Vote> findAllByVoterPhoneLast6DigitContaining(@Param("text") String text);
 
 }

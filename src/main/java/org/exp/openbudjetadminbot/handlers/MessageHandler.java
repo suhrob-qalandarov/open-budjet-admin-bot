@@ -11,11 +11,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.exp.openbudjetadminbot.models.Content;
 import org.exp.openbudjetadminbot.models.User;
+import org.exp.openbudjetadminbot.models.Vote;
 import org.exp.openbudjetadminbot.repository.UserRepository;
+import org.exp.openbudjetadminbot.repository.VoteRepository;
 import org.exp.openbudjetadminbot.service.face.UserService;
+import org.exp.openbudjetadminbot.service.feign.VoteService;
 import org.springframework.stereotype.Service;
 
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 @Service
@@ -25,6 +30,8 @@ public class MessageHandler implements Consumer<Message> {
     private final UserService userService;
     private final TelegramBot telegramBot;
     private final UserRepository userRepository;
+    private final VoteRepository voteRepository;
+    private final VoteService voteService;
 
     @SneakyThrows
     @Override
@@ -45,8 +52,10 @@ public class MessageHandler implements Consumer<Message> {
             } else {
                 telegramBot.execute(new SendMessage(
                                 dbUser.getId(),
-                                "Botga xush kelibsiz!\nBu bot ochiq budjetning Xorazm viloyati Ko'shko'pir tumani uchun ishlab chiqilgan!" +
-                                        "\n\n\nSiz ovoz bergansiz!"
+                                "Botga xush kelibsiz!\n\n" +
+                                        "Хоразм вилояти Қўшкўпир тумани" +
+                                        "\nXosiyon mahallasi Afrosiyob ko'chasini asfalt qilish" +
+                                        "\n\nSiz ovoz bergansiz!"
                         )
                 );
                 return;
@@ -60,13 +69,11 @@ public class MessageHandler implements Consumer<Message> {
             telegramBot.execute(new SendMessage(
                     dbUser.getId(),
                     """
-                            Хоразм вилояти Қўшкўпир тумани
-                            Xosiyon mahallasi Afrosiyob ko'chasini asfalt qilish"""
+                            Ovoz berilganligi aniqligi telefon raqamining oxirgi 6ta raqami orqali tekshiriladi!"""
             ).replyMarkup(new ReplyKeyboardRemove()));
 
             SendResponse response = telegramBot.execute(new SendMessage(dbUser.getId(), """
-                    Telefon raqami tekshirilayapti, kuting!
-                    Ovoz berilganligi aniqligi telefon raqamining oxirgi 6ta raqami orqali tekshiriladi!"""
+                    Telefon raqami tekshirilayapti, kuting!"""
             ));
 
             Thread.sleep(2500);
@@ -83,6 +90,14 @@ public class MessageHandler implements Consumer<Message> {
                 telegramBot.execute(new EditMessageText(dbUser.getId(), response.message().messageId(), "Siz ovoz bergansiz!"));
                 dbUser.setIsVoted(true);
                 userRepository.save(dbUser);
+
+                telegramBot.execute(new SendMessage(
+                        dbUser.getId(),
+                        "Quyidagilardan birini tanlang:"
+                ).replyMarkup(new ReplyKeyboardMarkup(
+                        new KeyboardButton("📊Ovozlar"),
+                        new KeyboardButton("✅Tekshirish")
+                )));
                 return;
 
             } else if (phoneNumbers.size() > 1) {
@@ -113,9 +128,60 @@ public class MessageHandler implements Consumer<Message> {
                 return;
             }
 
-        } else telegramBot.execute(new SendMessage(
-                dbUser.getId(),
-                "Noto'g'ri buyruq!\nIltimos tugmalardan foydalaning!")
-        );
+        } else if (Objects.requireNonNull(text).equals("📊Ovozlar")) {
+           voteService.sendVotesPage(message.chat().id(), 0, null);
+
+        } else if (text.equals("✅Tekshirish")) {
+            telegramBot.execute(new SendMessage(
+                    dbUser.getId(),
+                    "Telefon raqamini yozib yuboring!\nMasalan: +998901234567, 901234567, 4567, 45, 67"
+            ));
+
+        } else {
+            if (text.length() > 6) {
+                String last6Digits = text.substring(text.length() - 6);
+                List<Vote> votes = voteRepository.findAllByVoterPhoneLast6Digit(last6Digits);
+                sendResponse(votes, dbUser);
+            } else {
+                List<Vote> votes = voteRepository.findAllByVoterPhoneLast6DigitContaining(text);
+                sendResponse(votes, dbUser);
+            }
+        }
+    }
+
+    private void sendResponse(List<Vote> votes, User dbUser) {
+        if (!votes.isEmpty()) {
+            StringBuilder response = new StringBuilder("O'xshash raqamlar ro'yhati:\n\n");
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+            for (int i = 0; i < votes.size(); i++) {
+                Vote vote = votes.get(i);
+                response.append(i + 1)
+                        .append(". 📱: **-*")
+                        .append(formatPhoneNumber(vote.getVoterPhoneLast6Digit()))
+                        .append("\n🕗")
+                        .append(vote.getVoteDate().format(formatter))
+                        .append("\n\n");
+            }
+
+            telegramBot.execute(new SendMessage(
+                    dbUser.getId(),
+                    response.toString()
+            ));
+        } else {
+            telegramBot.execute(new SendMessage(
+                    dbUser.getId(),
+                    "Ovoz berilmagan yoki bazada mavjud emas!"
+            ));
+        }
+    }
+
+    private String formatPhoneNumber(String phoneNumber) {
+        if (phoneNumber == null || phoneNumber.length() != 6) {
+            return phoneNumber;
+        }
+        return phoneNumber.substring(0, 2) + "-" +
+                phoneNumber.substring(2, 4) + "-" +
+                phoneNumber.substring(4, 6);
     }
 }
