@@ -31,14 +31,11 @@ public class User {
 
     private Integer lastMessageId;
 
-    private String lastAction;
-
     @Builder.Default
     private Boolean enabled = false;
 
     @Builder.Default
     private Boolean admin = false;
 
-    private LocalDateTime lastActionDate = LocalDateTime.now();
     private LocalDateTime createdAt = LocalDateTime.now();
 }
