@@ -1,6 +1,8 @@
 package org.exp.openbudjetadminbot.repository;
 
 import org.exp.openbudjetadminbot.models.Vote;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -21,10 +23,14 @@ public interface VoteRepository extends JpaRepository<Vote, Long> {
 
     boolean existsByVoterPhoneLast6Digit(String voterPhoneLast6Digit);
 
+    Page<Vote> findAllByOrderByVoteDateDesc(Pageable pageable);
+
     List<Vote> findAllByVoterPhoneLast6DigitOrderByVoteDateDesc(String voterPhoneLast6Digit);
 
+    Page<Vote> findAllByVoterPhoneLast6Digit(String voterPhoneLast6Digit, Pageable pageable);
+
     @Query("SELECT v FROM Vote v WHERE v.voterPhoneLast6Digit LIKE %:text% ORDER BY v.voteDate DESC")
-    List<Vote> findAllByVoterPhoneLast6DigitContaining(@Param("text") String text);
+    Page<Vote> findAllByVoterPhoneLast6DigitContaining(@Param("text") String text, Pageable pageable);
 
     @Modifying
     @Query(value = """
