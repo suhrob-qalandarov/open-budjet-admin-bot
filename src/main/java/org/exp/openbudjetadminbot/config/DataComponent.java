@@ -5,46 +5,39 @@ import com.pengrad.telegrambot.request.SendMessage;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.exp.openbudjetadminbot.models.Content;
-import org.exp.openbudjetadminbot.models.User;
-import org.exp.openbudjetadminbot.repository.ContentRepository;
-import org.exp.openbudjetadminbot.repository.UserRepository;
-import org.exp.openbudjetadminbot.repository.VoteRepository;
+import org.exp.openbudjetadminbot.service.face.UserService;
 import org.exp.openbudjetadminbot.service.feign.VoteService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class DataComponent implements CommandLineRunner {
 
-    private final ContentRepository contentRepository;
     private final VoteService voteService;
-    private final VoteRepository voteRepository;
-    private final UserRepository userRepository;
-    private final TelegramBot telegramBot;
 
-    private static final String uuid = "368a9dce3ca336c5f73f408d8";
+    private static final String uuid = "68abda77ec67bd58e294251a";
+    private final UserService userService;
+    private final TelegramBot telegramBot;
 
     @Transactional
     @Override
     public void run(String... args) throws Exception {
+        long newVotesCount = voteService.fetchNewVotes(uuid, 0, 10);
+        if (newVotesCount == -1) {
+            telegramBot.execute(new SendMessage(
+                    3L,
+                    "💢Ma'lumotlarni o'qishda xatolik!"
+            ));
+            return;
+        }
+        userService.sendBaseUpdateMessageToUsers(newVotesCount);
+    }
+}
 
-        fetchVotesJob(uuid);
-        removeDuplicate();
-        //sendStarterMessageToUsers();
-
-        if (contentRepository.count() == 0){
+/*
+if (contentRepository.count() == 0){
             Content content = Content.builder()
                     .id(UUID.fromString("98844e33-4586-4474-bec3-5838c3ebaab3"))
                     .boardId(52L)
@@ -71,12 +64,13 @@ public class DataComponent implements CommandLineRunner {
                     .build();
             contentRepository.save(content);
         }
+*/
 
-    }
-
-    @Transactional
+/*
+@Transactional
     public void sendStarterMessageToUsers() {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
         LocalDateTime latestVoteDateNative = voteRepository.findLatestVoteDateNative();
         ExecutorService executor = Executors.newFixedThreadPool(5); // 5 ta thread
         List<User> users = userRepository.findAll();
@@ -85,9 +79,16 @@ public class DataComponent implements CommandLineRunner {
                 try {
                     telegramBot.execute(new SendMessage(
                             user.getId(),
-                            "🤖🔄Bot yangilandi qayta /start bosing!" +
-                                    "\n\n🕰Oxirgi yangilangan ma'lumotlar vaqti: " + latestVoteDateNative.format(formatter)
-                    ));
+                            //"🤖🔄Bot yangilandi qayta /start bosing!" +
+                                    "\n\uD83D\uDDDEYangi ovozlar ro'yhati olindi: " + count + " ta" +
+                                    "\n🕰Yangilangan ovozlar vaqti: " +
+                                    "\n📅Sana: " + latestVoteDateNative.format(dateFormatter) +
+                                    "\n⏰Vaqt: " + latestVoteDateNative.format(timeFormatter) +
+                                    "\n\nESLATMA!\n" + latestVoteDateNative.format(timeFormatter) +
+                                            " dan oldingi ovozlar ro'yhati mavjud!"
+                    )
+                                    //.replyMarkup(new ReplyKeyboardRemove())
+                    );
                     log.info("Message sent to user: {}", user.getId());
                 } catch (Exception e) {
                     log.error("Failed to send message to user {}: {}", user.getId(), e.getMessage());
@@ -101,18 +102,4 @@ public class DataComponent implements CommandLineRunner {
             log.error("Executor termination interrupted", e);
         }
     }
-
-    //@Scheduled(fixedRate = 3000)
-    public void fetchVotesJob(String id) {
-        voteService.fetchNewVotes(
-                id,
-                0,
-                10
-        );
-    }
-
-    @Transactional
-    public void removeDuplicate() {
-        voteRepository.deleteDuplicatesByVoterPhoneLast6DigitAndVoteDate();
-    }
-}
+*/
