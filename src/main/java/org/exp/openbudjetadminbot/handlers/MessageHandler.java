@@ -9,28 +9,25 @@ import com.pengrad.telegrambot.response.SendResponse;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.exp.openbudjetadminbot.models.User;
 import org.exp.openbudjetadminbot.models.Vote;
-import org.exp.openbudjetadminbot.repository.UserRepository;
-import org.exp.openbudjetadminbot.repository.VoteRepository;
 import org.exp.openbudjetadminbot.service.face.UserService;
 import org.exp.openbudjetadminbot.service.feign.VoteService;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MessageHandler implements Consumer<Message> {
 
-    private final UserService userService;
     private final TelegramBot telegramBot;
-    private final UserRepository userRepository;
-    private final VoteRepository voteRepository;
+    private final UserService userService;
     private final VoteService voteService;
 
     @Transactional
@@ -44,56 +41,81 @@ public class MessageHandler implements Consumer<Message> {
             String phone = message.contact().phoneNumber();
             if (!phone.startsWith("+")) phone = "+" + phone;
             dbUser.setPhoneNumber(phone);
-            userRepository.save(dbUser);
+            userService.updateDbUser(dbUser);
 
             telegramBot.execute(new SendMessage(
                     dbUser.getId(),
                     """
-                            🗳Ovoz berilganligi aniqligi telefon raqamining oxirgi 6ta raqami orqali tekshiriladi!"""
+                            📥Ovoz berilganligi aniqligi telefon raqamining oxirgi 6ta raqami orqali tekshiriladi!"""
             ).replyMarkup(new ReplyKeyboardRemove()));
 
             SendResponse response = telegramBot.execute(new SendMessage(dbUser.getId(), """
                         📲Telefon raqami tekshirilayapti, kuting!"""
             ));
 
-            List<String> phoneNumbers = userService.checkUserVoted(dbUser.getPhoneNumber());
+            List<Vote> votes = userService.checkUserVoted(dbUser.getPhoneNumber());
+            if (response.isOk()) {
+                Thread.sleep(2000);
+            }
 
-            if (phoneNumbers.size() == 1) {
+            if (votes.size() == 1) {
                 telegramBot.execute(new EditMessageText(dbUser.getId(), response.message().messageId(), "✅Siz ovoz bergansiz!"));
                 dbUser.setIsVoted(true);
-                userRepository.save(dbUser);
+                userService.updateDbUser(dbUser);
 
                 telegramBot.execute(new SendMessage(
                         dbUser.getId(),
-                        "Quyidagilardan birini tanlang:"
+                        "👇Quyidagilardan birini tanlang:"
                 ).replyMarkup(new ReplyKeyboardMarkup(
-                        new KeyboardButton("📊Ovozlar"),
-                        new KeyboardButton("✅Tekshirish")
-                )));
+                        new KeyboardButton("📊Ovozlarni ko'rish"),
+                        new KeyboardButton("✅Raqamni tekshirish")
+                ).resizeKeyboard(true)));
                 return;
 
-            } else if (phoneNumbers.size() > 1) {
-                telegramBot.execute(new EditMessageText(dbUser.getId(), response.message().messageId(), "Sizning telefon raqamingizning oxirgi 6 ta raqami(" + phoneNumbers.getFirst() + ")ga o'xshash "
-                        + phoneNumbers.size() + " ta raqam topildi!"
-                ));
-                telegramBot.execute(new SendMessage(
-                                dbUser.getId(),
-                                "📲Yana bir bor ovoz berib sinab ko'ring buning uchun Ovoz berish tugmasini bosing!"
+            } else if (votes.size() > 1) {
+
+                StringBuilder similarPhoneNumbers = new StringBuilder();
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+                for (int i = 0; i < votes.size(); i++) {
+                    Vote vote = votes.get(i);
+                    similarPhoneNumbers.append(i + 1)
+                            .append(". 📱: **-*")
+                            .append(voteService.formatPhoneNumber(vote.getVoterPhoneLast6Digit()))
+                            .append("\n🕗")
+                            .append(vote.getVoteDate().format(formatter))
+                            .append("\n\n");
+                }
+
+                telegramBot.execute(new EditMessageText(
+                        dbUser.getId(),
+                        response.message().messageId(),
+                        "⁉\uFE0FOvoz berilganligi no'malum⁉\n\uD83D\uDCF2Telefon raqami: **-*"
+                                + voteService.formatPhoneNumber(votes.getFirst().getVoterPhoneLast6Digit()) + " ga mos "
+                                + votes.size() + " ta raqam topildi:\n\n" +
+                                similarPhoneNumbers + """
+                                👆Ro'yhatda ovoz bergan vaqtiga mos bo'lsa Ovoz berdim
+                                📲Aks holda Ovoz berish tugmasini bosing"""
                         ).replyMarkup(new InlineKeyboardMarkup(
-                                new InlineKeyboardButton("Ovoz berish").url("https://t.me/ochiqbudjetbot?start=052408466012")
+                                new InlineKeyboardButton("📥Ovoz berish📥").url("https://t.me/ochiqbudjetbot?start=052408466012"),
+                                new InlineKeyboardButton("📨Ovoz berdim📨").callbackData("voted")
                         ))
                 );
                 return;
 
             } else {
-                telegramBot.execute(new EditMessageText(dbUser.getId(), response.message().messageId(), "❌️Siz ovoz bermagansiz!"));
+                SendResponse execute = (SendResponse) telegramBot.execute(new EditMessageText(dbUser.getId(), response.message().messageId(), "❌️Siz ovoz bermagansiz!"));
+                dbUser.setLastMessageId(execute.message().messageId());
+                userService.updateDbUser(dbUser);
                 telegramBot.execute(new SendMessage(
                                 dbUser.getId(),
                                 """
                                         🚀️️️️️️Iltimos ovoz bering va o'z hissangizni qo'shing!
-                                        📣️️️️️️Ovoz berish uchun Ovoz berish tugmasini bosing!"""
+                                        📣️️️️️️Ovoz berish uchun Ovoz berish tugmasini bosing!
+                                        🗳Ovoz berib Ovoz berdim tugmasini bosing!"""
                         ).replyMarkup(new InlineKeyboardMarkup(
-                                new InlineKeyboardButton("Ovoz berish").url("https://t.me/ochiqbudjetbot?start=052408466012")
+                                new InlineKeyboardButton("📥Ovoz berish📥").url("https://t.me/ochiqbudjetbot?start=052408466012"),
+                                new InlineKeyboardButton("📨Ovoz berdim📨").callbackData("voted")
                         ))
                 );
                 return;
