@@ -128,106 +128,49 @@ public class MessageHandler implements Consumer<Message> {
 
                 telegramBot.execute(new SendMessage(
                                 dbUser.getId(),
-                                "🤗Botga xush kelibsiz!\n\uD83E\uDD16Bu bot ochiq budjetning Xorazm viloyati, Qo'shko'pir tumani, Xosiyon qishlog'i uchun ishlab chiqilgan!" +
-                                        "\n\n❗ESLATMA!\n📲Kontaktni ulashish tugmasi orqali telefon raqamingizni yuboring!"
-                        ).replyMarkup(new ReplyKeyboardMarkup(new KeyboardButton("📲Kontaktni ulashish").requestContact(true)))
+                                "🤗Botga xush kelibsiz!\n\uD83E\uDD16Bu bot Xorazm vil. Qo'shko'pir tumani, Xosiyon qishlog'i uchun ishlab chiqilgan!" +
+                                        "\n\n❗ESLATMA\n📲Kontaktni ulashish tugmasi orqali telefon raqamingizni yuboring!"
+                        ).replyMarkup(new ReplyKeyboardMarkup(new KeyboardButton("📲Kontaktni ulashish").requestContact(true)).resizeKeyboard(true))
                 );
                 return;
 
-            }  else if (Objects.requireNonNull(text).equals("📊Ovozlar")) {
+            }  else if (Objects.requireNonNull(text).equals("📊Ovozlarni ko'rish")) {
                 voteService.sendVotesPage(message.chat().id(), 0, null);
 
-            } else if (text.equals("✅Tekshirish")) {
-                telegramBot.execute(new SendMessage(
-                        dbUser.getId(),
+            } else if (text.equals("✅Raqamni tekshirish")) {
+                telegramBot.execute(new SendMessage(dbUser.getId(),
                         "📞Telefon raqamini yozib yuboring!\n📂Masalan: +998901234567, 901234567, 4567, 45, 67"
                 ));
 
-            } else if (text.startsWith("update_base_")) {
+            } else if (text.startsWith("68ab")) {
+                long newVotesCount = 0;
                 String uuid = text.substring(text.lastIndexOf("_") + 1);
-                voteService.fetchNewVotes(
-                        uuid,
-                        0,
-                        10
-                );
 
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-                LocalDateTime latestVoteDateNative = voteRepository.findLatestVoteDateNative();
-                telegramBot.execute(new SendMessage(
-                        dbUser.getId(),
-                        "🕰Oxirgi olingan ma'lumotlar vaqti: " + latestVoteDateNative.format(formatter)
+                newVotesCount = voteService.fetchNewVotes(uuid, 0, 10);
+
+                if (newVotesCount == -1) {
+                    telegramBot.execute(new SendMessage(dbUser.getId(),
+                            "💢Ma'lumotlarni o'qishda xatolik!"
+                    ));
+                    return;
+                }
+
+                telegramBot.execute(new SendMessage(dbUser.getId(),
+                        """
+                                🆕Yangi ma'lumotlar o'qib olindi va saqlandi!
+                                💢Dublikat ma'lumotlar o'chirildi!"""
                 ));
+                userService.sendBaseUpdateMessageToUsers(newVotesCount);
 
-                voteRepository.deleteDuplicatesByVoterPhoneLast6DigitAndVoteDate();
-
-                telegramBot.execute(new SendMessage(
-                        dbUser.getId(),
-                        "💢Duplicate ma'lumotlar o'chirildi! "
-                ));
+            } else if (text.matches("\\d+")) {
+                voteService.sendVotesByPhone(dbUser.getId(), text, 0, null);
 
             } else {
-                if (text.length() > 6) {
-                    String last6Digits = text.substring(text.length() - 6);
-                    List<Vote> votes = voteRepository.findAllByVoterPhoneLast6DigitOrderByVoteDateDesc(last6Digits);
-                    sendResponse(votes, dbUser);
-                } else {
-                    List<Vote> votes = voteRepository.findAllByVoterPhoneLast6DigitContaining(text);
-                    sendResponse(votes, dbUser);
-                }
+                telegramBot.execute(new SendMessage(
+                        dbUser.getId(),
+                        "Siz kiritdingiz: " + text
+                ));
             }
         }
-    }
-
-    private void sendResponse(List<Vote> votes, User dbUser) {
-        if (!votes.isEmpty()) {
-            StringBuilder response = new StringBuilder("☎\uFE0FO'xshash raqamlar ro'yhati:\n\n");
-            StringBuilder response2 = new StringBuilder("------------------------------\n\n");
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
-            for (int i = 0; i < votes.size()/2; i++) {
-                Vote vote = votes.get(i);
-                response.append(i + 1)
-                        .append(". 📱: **-*")
-                        .append(formatPhoneNumber(vote.getVoterPhoneLast6Digit()))
-                        .append("\n🕗")
-                        .append(vote.getVoteDate().format(formatter))
-                        .append("\n\n");
-            }
-
-            telegramBot.execute(new SendMessage(
-                    dbUser.getId(),
-                    response.toString()
-            ));
-
-            for (int i = votes.size()/2; i < votes.size(); i++) {
-                Vote vote = votes.get(i);
-                response2.append(i + 1)
-                        .append(". 📱: **-*")
-                        .append(formatPhoneNumber(vote.getVoterPhoneLast6Digit()))
-                        .append("\n🕗")
-                        .append(vote.getVoteDate().format(formatter))
-                        .append("\n\n");
-            }
-
-            telegramBot.execute(new SendMessage(
-                    dbUser.getId(),
-                    response2.toString()
-            ));
-
-        } else {
-            telegramBot.execute(new SendMessage(
-                    dbUser.getId(),
-                    "⭕ Ovoz berilmagan yoki bazada mavjud emas ⁉\uFE0F"
-            ));
-        }
-    }
-
-    private String formatPhoneNumber(String phoneNumber) {
-        if (phoneNumber == null || phoneNumber.length() != 6) {
-            return phoneNumber;
-        }
-        return phoneNumber.substring(0, 2) + "-" +
-                phoneNumber.substring(2, 4) + "-" +
-                phoneNumber.substring(4, 6);
     }
 }
